@@ -1,3 +1,6 @@
+// mark JS as active so CSS can safely hide scroll-reveal elements
+document.documentElement.classList.add("js");
+
 // ── Google Sheets endpoint (TODO: replace with new Ortiz sheet URL)
 const SCRIPT_URL = "PLACEHOLDER_GOOGLE_SCRIPT_URL";
 
@@ -5,8 +8,18 @@ const SCRIPT_URL = "PLACEHOLDER_GOOGLE_SCRIPT_URL";
 // 1. NAV — scroll state
 // ─────────────────────────────────────────────
 const nav = document.getElementById("nav");
+let lastNavY = window.scrollY;
 window.addEventListener("scroll", () => {
-  nav.classList.toggle("scrolled", window.scrollY > 60);
+  const y = window.scrollY;
+  nav.classList.toggle("scrolled", y > 60);
+
+  // hide on scroll-down (past the hero), reveal on scroll-up
+  if (y > 320 && y > lastNavY + 4) {
+    nav.classList.add("nav-hidden");
+  } else if (y < lastNavY - 4) {
+    nav.classList.remove("nav-hidden");
+  }
+  lastNavY = y;
 }, { passive: true });
 
 // ─────────────────────────────────────────────
@@ -72,14 +85,14 @@ if (typeEl) {
 }
 
 // ─────────────────────────────────────────────
-// 4. STATS COUNT-UP
+// 4. STATS COUNT-UP + TRUCK REVEAL
 // ─────────────────────────────────────────────
 function easeOutQuad(t) { return t * (2 - t); }
 
 function animateCount(el) {
   const target   = parseInt(el.dataset.target, 10);
   const suffix   = el.dataset.suffix || "";
-  const duration = 1500;
+  const duration = 1400;
   let   start    = null;
 
   function step(ts) {
@@ -92,82 +105,77 @@ function animateCount(el) {
   requestAnimationFrame(step);
 }
 
-const statNums = document.querySelectorAll(".stat-num[data-target]");
-const statsObs = new IntersectionObserver((entries) => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
-      animateCount(e.target);
-      statsObs.unobserve(e.target);
-    }
-  });
-}, { threshold: 0.5 });
-statNums.forEach(el => statsObs.observe(el));
+const statsBar = document.getElementById("statsBar");
+const statEls  = statsBar ? [...statsBar.querySelectorAll(".stat")] : [];
 
-// ─────────────────────────────────────────────
-// 5. TRUCK SCROLLER — moves left↔right on scroll
-// ─────────────────────────────────────────────
-const truckScroller = document.getElementById("truckScroller");
-const truckerSection = truckScroller ? truckScroller.closest(".truck-scroller-section") : null;
+function revealStat(stat) {
+  if (!stat || stat.dataset.revealed) return;
+  stat.dataset.revealed = "1";
+  stat.classList.add("visible");
+  const num = stat.querySelector(".stat-num[data-target]");
+  if (num) animateCount(num);
+}
 
-if (truckScroller && truckerSection) {
+const statsTruck   = document.getElementById("statsTruck");
+const desktopTruck = window.matchMedia("(min-width: 981px)").matches;
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+if (statsBar && statsTruck && desktopTruck && !reduceMotion) {
+  // DESKTOP: the truck drives across the stats bar and reveals each stat in its wake
+  statsBar.classList.add("truck-mode");
   let rafId = null;
-  let lastScrollY = window.scrollY;
 
   function updateTruck() {
-    const rect     = truckerSection.getBoundingClientRect();
-    const vpH      = window.innerHeight;
-    // how far the section has travelled through viewport: 0 = just entered bottom, 1 = just left top
-    const progress = 1 - (rect.bottom / (vpH + rect.height));
-    const clamped  = Math.max(0, Math.min(1, progress));
-
-    // truck starts off left (-10vw) and drives to right (110vw)
-    const xPercent = clamped * 120 - 10;
-    truckScroller.style.transform = `translateX(${xPercent}vw)`;
-
-    // flip image based on direction
-    if (window.scrollY > lastScrollY) {
-      truckScroller.style.transform = `translateX(${xPercent}vw) scaleX(1)`;
-    } else {
-      truckScroller.style.transform = `translateX(${xPercent}vw) scaleX(-1)`;
-    }
-    lastScrollY = window.scrollY;
     rafId = null;
+    const rect = statsBar.getBoundingClientRect();
+    const vpH  = window.innerHeight;
+    // 0 → 1 as the bar travels from entering the viewport bottom to leaving the top
+    const progress = Math.max(0, Math.min(1, (vpH - rect.top) / (vpH + rect.height)));
+
+    const truckW = statsTruck.offsetWidth || 120;
+    const travel = rect.width + truckW * 1.6;          // fully off-left → fully off-right
+    const x      = progress * travel - truckW * 1.3;
+    statsTruck.style.transform = `translateX(${x}px)`;
+
+    // reveal a stat once the truck's front bumper has passed its center
+    const bumperX = rect.left + x + truckW;
+    statEls.forEach(stat => {
+      const s = stat.getBoundingClientRect();
+      if (bumperX >= s.left + s.width * 0.5) revealStat(stat);
+    });
+    if (progress >= 0.98) statEls.forEach(revealStat); // safety: never leave one hidden
   }
 
-  window.addEventListener("scroll", () => {
-    if (!rafId) rafId = requestAnimationFrame(updateTruck);
-  }, { passive: true });
-
-  updateTruck(); // init position
+  const onScroll = () => { if (!rafId) rafId = requestAnimationFrame(updateTruck); };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll, { passive: true });
+  if (!statsTruck.complete) statsTruck.addEventListener("load", onScroll);
+  updateTruck();
+} else if (statEls.length) {
+  // MOBILE / reduced-motion: no truck — just staggered reveal + count-up on scroll-in
+  const statObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { revealStat(e.target); statObs.unobserve(e.target); }
+    });
+  }, { threshold: 0.4 });
+  statEls.forEach(el => statObs.observe(el));
 }
 
 // ─────────────────────────────────────────────
-// 6. WHY US — stagger-in animations
+// 6. SCROLL REVEAL — generic .visible toggle
 // ─────────────────────────────────────────────
-const whyPhoto    = document.getElementById("whyPhoto");
-const whyFeatures = document.querySelectorAll(".why-feature");
-
-const whyPhotoObs = new IntersectionObserver((entries) => {
+const revealEls = document.querySelectorAll(
+  ".why-map-wrap, .why-inner, .svc-card, .field"
+);
+const revealObs = new IntersectionObserver((entries) => {
   entries.forEach(e => {
     if (e.isIntersecting) {
       e.target.classList.add("visible");
-      whyPhotoObs.unobserve(e.target);
+      revealObs.unobserve(e.target);
     }
   });
-}, { threshold: 0.2 });
-if (whyPhoto) whyPhotoObs.observe(whyPhoto);
-
-const whyFeatObs = new IntersectionObserver((entries) => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
-      const idx   = [...whyFeatures].indexOf(e.target);
-      const delay = idx * 120;
-      setTimeout(() => e.target.classList.add("visible"), delay);
-      whyFeatObs.unobserve(e.target);
-    }
-  });
-}, { threshold: 0.3 });
-whyFeatures.forEach(el => whyFeatObs.observe(el));
+}, { threshold: 0.15, rootMargin: "0px 0px -40px 0px" });
+revealEls.forEach(el => revealObs.observe(el));
 
 // ─────────────────────────────────────────────
 // 7. SERVICE SCROLL DOTS
@@ -175,18 +183,35 @@ whyFeatures.forEach(el => whyFeatObs.observe(el));
 const track = document.getElementById("servicesTrack");
 const dots  = document.querySelectorAll(".scroll-dot");
 
+function cardStep() {
+  const w = track.querySelector(".svc-card")?.getBoundingClientRect().width;
+  return (w ? w + 18 : 300);
+}
+
 if (track && dots.length) {
   track.addEventListener("scroll", () => {
-    const scrollLeft = track.scrollLeft;
-    const cardWidth  = track.querySelector(".svc-card")?.offsetWidth + 18 || 318;
-    const activeIdx  = Math.round(scrollLeft / cardWidth);
+    const activeIdx = Math.round(track.scrollLeft / cardStep());
     dots.forEach((d, i) => d.classList.toggle("active", i === activeIdx));
   }, { passive: true });
 
   dots.forEach((dot, i) => {
     dot.addEventListener("click", () => {
-      const cardWidth = track.querySelector(".svc-card")?.offsetWidth + 18 || 318;
-      track.scrollTo({ left: i * cardWidth, behavior: "smooth" });
+      track.scrollTo({ left: i * cardStep(), behavior: "smooth" });
+    });
+  });
+}
+
+// Service cards: hover reveals the overlay on mouse, but touch has no hover —
+// so on touch devices, tapping a card toggles its .flipped state (and closes siblings).
+const isTouch = window.matchMedia("(hover: none)").matches;
+if (isTouch) {
+  document.querySelectorAll(".svc-card").forEach(card => {
+    card.addEventListener("click", (e) => {
+      // let the CTA links inside the overlay work normally
+      if (e.target.closest("a")) return;
+      const wasOpen = card.classList.contains("flipped");
+      document.querySelectorAll(".svc-card.flipped").forEach(c => c.classList.remove("flipped"));
+      if (!wasOpen) card.classList.add("flipped");
     });
   });
 }
@@ -273,3 +298,36 @@ if (form) {
     }
   });
 }
+
+// ─────────────────────────────────────────────
+// 9. LEGAL MODALS (privacy / terms)
+// ─────────────────────────────────────────────
+function closeLegal(m) {
+  m.classList.remove("open");
+  m.setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
+
+document.querySelectorAll("[data-modal]").forEach(trigger => {
+  trigger.addEventListener("click", (e) => {
+    e.preventDefault();
+    const m = document.getElementById(trigger.dataset.modal);
+    if (!m) return;
+    m.classList.add("open");
+    m.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    m.scrollTop = 0;
+  });
+});
+
+document.querySelectorAll(".legal-modal").forEach(m => {
+  m.addEventListener("click", (e) => {
+    if (e.target === m || e.target.closest("[data-close]")) closeLegal(m);
+  });
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    document.querySelectorAll(".legal-modal.open").forEach(closeLegal);
+  }
+});

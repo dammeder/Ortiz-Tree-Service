@@ -1,279 +1,292 @@
-// mark JS as active so CSS can safely hide scroll-reveal elements
+// =============================================================
+// OZZY'S TREE SERVICE — script.js
+// =============================================================
+
 document.documentElement.classList.add("js");
 
-// ── Google Sheets endpoint (TODO: replace with new Ortiz sheet URL)
-const SCRIPT_URL = "PLACEHOLDER_GOOGLE_SCRIPT_URL";
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // ─────────────────────────────────────────────
-// 1. NAV — scroll state
+// 1. NAV — scrolled state + auto-hide on scroll-down
 // ─────────────────────────────────────────────
 const nav = document.getElementById("nav");
-let lastNavY = window.scrollY;
+let lastY = window.scrollY;
+
 window.addEventListener("scroll", () => {
   const y = window.scrollY;
-  nav.classList.toggle("scrolled", y > 60);
-
-  // hide on scroll-down (past the hero), reveal on scroll-up
-  if (y > 320 && y > lastNavY + 4) {
-    nav.classList.add("nav-hidden");
-  } else if (y < lastNavY - 4) {
-    nav.classList.remove("nav-hidden");
+  if (nav) {
+    nav.classList.toggle("scrolled", y > 60);
+    if (y > 320 && y > lastY + 4) nav.classList.add("nav-hidden");
+    else if (y < lastY - 4) nav.classList.remove("nav-hidden");
   }
-  lastNavY = y;
+  lastY = y;
 }, { passive: true });
 
 // ─────────────────────────────────────────────
 // 2. MOBILE DRAWER
 // ─────────────────────────────────────────────
 const hamburger = document.getElementById("hamburger");
-const drawer    = document.getElementById("drawer");
+const drawer = document.getElementById("drawer");
 
-hamburger.addEventListener("click", () => {
-  const open = drawer.classList.toggle("open");
-  hamburger.setAttribute("aria-expanded", open);
-  drawer.setAttribute("aria-hidden", !open);
-  document.body.style.overflow = open ? "hidden" : "";
-});
-
-drawer.querySelectorAll("a").forEach(a => {
-  a.addEventListener("click", () => {
-    drawer.classList.remove("open");
-    hamburger.setAttribute("aria-expanded", "false");
-    drawer.setAttribute("aria-hidden", "true");
-    document.body.style.overflow = "";
-  });
-});
+if (hamburger && drawer) {
+  const setDrawer = (open) => {
+    drawer.classList.toggle("open", open);
+    hamburger.setAttribute("aria-expanded", String(open));
+    drawer.setAttribute("aria-hidden", String(!open));
+    document.body.style.overflow = open ? "hidden" : "";
+  };
+  hamburger.addEventListener("click", () => setDrawer(!drawer.classList.contains("open")));
+  drawer.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => setDrawer(false)));
+}
 
 // ─────────────────────────────────────────────
 // 3. TYPEWRITER HERO
 // ─────────────────────────────────────────────
-const phrases = [
-  "WE HANDLE WHAT NATURE THROWS AT YOU.",
-  "TREES DOWN? WE'RE ON THE WAY.",
-  "SAFE. CLEAN. DONE RIGHT.",
-];
 const typeEl = document.getElementById("typewriter-text");
+const phrases = [
+  "Professional Tree Removal & Care",
+  "Trees Down? We're On the Way.",
+  "Safe, Clean, Done Right.",
+];
 
-if (typeEl) {
-  let phraseIdx = 0, charIdx = 0, deleting = false;
+if (typeEl && !reduceMotion) {
+  let pi = 0, ci = 0, deleting = false;
 
-  function tick() {
-    const current = phrases[phraseIdx];
-
+  const tick = () => {
+    const cur = phrases[pi];
     if (!deleting) {
-      typeEl.textContent = current.slice(0, ++charIdx);
-      if (charIdx === current.length) {
-        deleting = true;
-        setTimeout(tick, 2200);
-        return;
-      }
-      setTimeout(tick, 68);
+      typeEl.textContent = cur.slice(0, ++ci);
+      if (ci === cur.length) { deleting = true; return setTimeout(tick, 2200); }
+      setTimeout(tick, 62);
     } else {
-      typeEl.textContent = current.slice(0, --charIdx);
-      if (charIdx === 0) {
-        deleting = false;
-        phraseIdx = (phraseIdx + 1) % phrases.length;
-        setTimeout(tick, 320);
-        return;
-      }
-      setTimeout(tick, 38);
+      typeEl.textContent = cur.slice(0, --ci);
+      if (ci === 0) { deleting = false; pi = (pi + 1) % phrases.length; return setTimeout(tick, 320); }
+      setTimeout(tick, 34);
     }
-  }
-
-  // start after hero animation finishes
-  setTimeout(tick, 700);
+  };
+  setTimeout(tick, 900);
 }
 
 // ─────────────────────────────────────────────
-// 4. STATS COUNT-UP + TRUCK REVEAL
+// 4. STATS COUNT-UP
 // ─────────────────────────────────────────────
-function easeOutQuad(t) { return t * (2 - t); }
+const easeOutQuad = (t) => t * (2 - t);
 
 function animateCount(el) {
-  const target   = parseInt(el.dataset.target, 10);
-  const suffix   = el.dataset.suffix || "";
-  const duration = 1400;
-  let   start    = null;
+  const target = parseInt(el.dataset.target, 10);
+  const suffix = el.dataset.suffix || "";
+  if (Number.isNaN(target)) return;
+  if (reduceMotion) { el.innerHTML = target + `<span class="suffix">${suffix}</span>`; return; }
 
-  function step(ts) {
+  const dur = 1400;
+  let start = null;
+  const step = (ts) => {
     if (!start) start = ts;
-    const progress = Math.min((ts - start) / duration, 1);
-    const val      = Math.floor(easeOutQuad(progress) * target);
-    el.innerHTML   = val + `<span class="suffix">${suffix}</span>`;
-    if (progress < 1) requestAnimationFrame(step);
-  }
+    const p = Math.min((ts - start) / dur, 1);
+    el.innerHTML = Math.floor(easeOutQuad(p) * target) + `<span class="suffix">${suffix}</span>`;
+    if (p < 1) requestAnimationFrame(step);
+  };
   requestAnimationFrame(step);
 }
 
-const statsBar = document.getElementById("statsBar");
-const statEls  = statsBar ? [...statsBar.querySelectorAll(".stat")] : [];
-
-function revealStat(stat) {
-  if (!stat || stat.dataset.revealed) return;
-  stat.dataset.revealed = "1";
-  stat.classList.add("visible");
-  const num = stat.querySelector(".stat-num[data-target]");
-  if (num) animateCount(num);
-}
-
-const statsTruck   = document.getElementById("statsTruck");
-const desktopTruck = window.matchMedia("(min-width: 981px)").matches;
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-if (statsBar && statsTruck && desktopTruck && !reduceMotion) {
-  // DESKTOP: the truck drives across the stats bar and reveals each stat in its wake
-  statsBar.classList.add("truck-mode");
-  let rafId = null;
-
-  function updateTruck() {
-    rafId = null;
-    const rect = statsBar.getBoundingClientRect();
-    const vpH  = window.innerHeight;
-    // 0 → 1 as the bar travels from entering the viewport bottom to leaving the top
-    const progress = Math.max(0, Math.min(1, (vpH - rect.top) / (vpH + rect.height)));
-
-    const truckW = statsTruck.offsetWidth || 120;
-    const travel = rect.width + truckW * 1.6;          // fully off-left → fully off-right
-    const x      = progress * travel - truckW * 1.3;
-    statsTruck.style.transform = `translateX(${x}px)`;
-
-    // reveal a stat once the truck's front bumper has passed its center
-    const bumperX = rect.left + x + truckW;
-    statEls.forEach(stat => {
-      const s = stat.getBoundingClientRect();
-      if (bumperX >= s.left + s.width * 0.5) revealStat(stat);
-    });
-    if (progress >= 0.98) statEls.forEach(revealStat); // safety: never leave one hidden
-  }
-
-  const onScroll = () => { if (!rafId) rafId = requestAnimationFrame(updateTruck); };
-  window.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", onScroll, { passive: true });
-  if (!statsTruck.complete) statsTruck.addEventListener("load", onScroll);
-  updateTruck();
-} else if (statEls.length) {
-  // MOBILE / reduced-motion: no truck — just staggered reveal + count-up on scroll-in
+const statEls = [...document.querySelectorAll("#statsBar .stat")];
+if (statEls.length) {
   const statObs = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) { revealStat(e.target); statObs.unobserve(e.target); }
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      const num = e.target.querySelector(".stat-num[data-target]");
+      if (num) animateCount(num);
+      statObs.unobserve(e.target);
     });
   }, { threshold: 0.4 });
-  statEls.forEach(el => statObs.observe(el));
+  statEls.forEach((el) => statObs.observe(el));
 }
 
 // ─────────────────────────────────────────────
-// 6. SCROLL REVEAL — generic .visible toggle
+// 5. SCROLL REVEAL + COVERAGE MAP TRIGGER
 // ─────────────────────────────────────────────
-const revealEls = document.querySelectorAll(
-  ".why-map-wrap, .why-inner, .svc-card, .field"
-);
-const revealObs = new IntersectionObserver((entries) => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
+const revealTargets = document.querySelectorAll(".reveal, #coverageMap");
+if (revealTargets.length) {
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
       e.target.classList.add("visible");
-      revealObs.unobserve(e.target);
+      obs.unobserve(e.target);
+    });
+  }, { threshold: 0.15, rootMargin: "0px 0px -40px 0px" });
+  revealTargets.forEach((el) => obs.observe(el));
+}
+
+// ─────────────────────────────────────────────
+// 6. REVIEWS — drag marquee with inertia
+// ─────────────────────────────────────────────
+const mqWrap = document.getElementById("marqueeWrap");
+const mqTrack = document.getElementById("marqueeTrack");
+
+if (mqWrap && mqTrack && !reduceMotion) {
+  const BASE = 0.4;              // px/frame leftward drift (~24px/s)
+  const DRAG_THRESHOLD = 6;      // px of horizontal movement before we take over
+  let x = 0;
+  let vx = -BASE;               // current velocity, px/frame
+  let half = mqTrack.scrollWidth / 2;
+  let dragging = false;         // actively moving the track with a finger
+  let pending = null;           // pointer touched down but hasn't passed the threshold
+  let lastX = 0, lastT = 0, vSample = 0;
+
+  const measure = () => { half = mqTrack.scrollWidth / 2 || half; };
+  window.addEventListener("resize", measure, { passive: true });
+  window.addEventListener("load", measure);
+
+  const normalize = () => {
+    if (!half) return;
+    while (x <= -half) x += half;
+    while (x > 0) x -= half;
+  };
+
+  const frame = () => {
+    if (!dragging) {
+      x += vx;
+      vx += (-BASE - vx) * 0.045;   // ease back to base drift
+      normalize();
+      mqTrack.style.transform = `translateX(${x}px)`;
     }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+
+  mqWrap.addEventListener("pointerdown", (e) => {
+    pending = { id: e.pointerId, startX: e.clientX, startY: e.clientY };
+    lastX = e.clientX;
+    lastT = performance.now();
+    vSample = 0;
   });
-}, { threshold: 0.15, rootMargin: "0px 0px -40px 0px" });
-revealEls.forEach(el => revealObs.observe(el));
 
-// ─────────────────────────────────────────────
-// 7. SERVICE SCROLL DOTS
-// ─────────────────────────────────────────────
-const track = document.getElementById("servicesTrack");
-const dots  = document.querySelectorAll(".scroll-dot");
-
-function cardStep() {
-  const w = track.querySelector(".svc-card")?.getBoundingClientRect().width;
-  return (w ? w + 18 : 300);
-}
-
-if (track && dots.length) {
-  track.addEventListener("scroll", () => {
-    const activeIdx = Math.round(track.scrollLeft / cardStep());
-    dots.forEach((d, i) => d.classList.toggle("active", i === activeIdx));
-  }, { passive: true });
-
-  dots.forEach((dot, i) => {
-    dot.addEventListener("click", () => {
-      track.scrollTo({ left: i * cardStep(), behavior: "smooth" });
-    });
+  mqWrap.addEventListener("pointermove", (e) => {
+    if (pending && !dragging) {
+      const dx = e.clientX - pending.startX;
+      const dy = e.clientY - pending.startY;
+      // let vertical gestures scroll the page untouched
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > DRAG_THRESHOLD) { pending = null; return; }
+      if (Math.abs(dx) < DRAG_THRESHOLD) return;
+      dragging = true;
+      mqWrap.classList.add("dragging");
+      if (mqWrap.setPointerCapture) mqWrap.setPointerCapture(pending.id);
+    }
+    if (!dragging) return;
+    const now = performance.now();
+    const dx = e.clientX - lastX;
+    x += dx;
+    normalize();
+    mqTrack.style.transform = `translateX(${x}px)`;
+    const dt = now - lastT || 16;
+    vSample = (dx / dt) * 16;
+    lastX = e.clientX;
+    lastT = now;
   });
+
+  const endDrag = () => {
+    pending = null;
+    if (!dragging) return;
+    dragging = false;
+    mqWrap.classList.remove("dragging");
+    if (Math.abs(vSample) > 0.5) vx = Math.max(-45, Math.min(45, vSample));
+    vSample = 0;
+  };
+  mqWrap.addEventListener("pointerup", endDrag);
+  mqWrap.addEventListener("pointercancel", endDrag);
+  mqWrap.addEventListener("pointerleave", endDrag);
 }
 
-// Service cards: hover reveals the overlay on mouse, but touch has no hover —
-// so on touch devices, tapping a card toggles its .flipped state (and closes siblings).
-const isTouch = window.matchMedia("(hover: none)").matches;
-if (isTouch) {
-  document.querySelectorAll(".svc-card").forEach(card => {
-    card.addEventListener("click", (e) => {
-      // let the CTA links inside the overlay work normally
-      if (e.target.closest("a")) return;
-      const wasOpen = card.classList.contains("flipped");
-      document.querySelectorAll(".svc-card.flipped").forEach(c => c.classList.remove("flipped"));
-      if (!wasOpen) card.classList.add("flipped");
-    });
+// ─────────────────────────────────────────────
+// 7. MODALS (success + legal)
+// ─────────────────────────────────────────────
+function openModal(m) {
+  if (!m) return;
+  m.classList.add("open");
+  m.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  const card = m.querySelector(".legal-card");
+  if (card) card.scrollTop = 0;
+}
+function closeModal(m) {
+  if (!m) return;
+  m.classList.remove("open");
+  m.setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
+
+document.querySelectorAll("[data-modal]").forEach((trigger) => {
+  trigger.addEventListener("click", (e) => {
+    e.preventDefault();
+    openModal(document.getElementById(trigger.dataset.modal));
   });
-}
+});
+
+document.querySelectorAll(".modal").forEach((m) => {
+  m.addEventListener("click", (e) => {
+    if (e.target === m || e.target.closest("[data-close]")) closeModal(m);
+  });
+});
+
+const closeSuccessBtn = document.getElementById("closeSuccessBtn");
+const successModal = document.getElementById("successModal");
+if (closeSuccessBtn) closeSuccessBtn.addEventListener("click", () => closeModal(successModal));
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") document.querySelectorAll(".modal.open").forEach(closeModal);
+});
 
 // ─────────────────────────────────────────────
-// 8. FORM SUBMISSION
+// 8. QUOTE FORM
 // ─────────────────────────────────────────────
-const form       = document.getElementById("quoteForm");
-const submitBtn  = document.getElementById("submitBtn");
-const modal      = document.getElementById("successModal");
-const modalMsg   = document.getElementById("modalMsg");
-const closeModal = document.getElementById("closeModalBtn");
+const SCRIPT_URL = "PLACEHOLDER_GOOGLE_SCRIPT_URL"; // TODO: paste Ozzy's Apps Script web-app URL
 
-function showModal(success, msg) {
-  if (success) {
-    modalMsg.innerHTML = msg || "We'll reach out as soon as possible. Or call us at <a href=\"tel:+12678866868\" style=\"color:var(--green);font-weight:700\">(267) 886-6868</a>.";
-  } else {
-    modalMsg.innerHTML = msg || "Something went wrong. Please call us at <a href=\"tel:+12678866868\" style=\"color:var(--green);font-weight:700\">(267) 886-6868</a>.";
-  }
-  modal.classList.add("open");
-  modal.setAttribute("aria-hidden", "false");
-  closeModal.focus();
+const form = document.getElementById("quoteForm");
+const submitBtn = document.getElementById("submitBtn");
+const successMsg = document.getElementById("successMsg");
+
+function showResult(ok, msg) {
+  if (successMsg && msg) successMsg.innerHTML = msg;
+  openModal(successModal);
 }
 
-function hideModal() {
-  modal.classList.remove("open");
-  modal.setAttribute("aria-hidden", "true");
-}
-
-if (closeModal) closeModal.addEventListener("click", hideModal);
-modal?.addEventListener("click", e => { if (e.target === modal) hideModal(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape") hideModal(); });
-
-if (form) {
+if (form && submitBtn) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
+    // NB: access controls via form.elements — `form.name` resolves to the
+    // form's own name property, not the <input name="name">.
+    const f = form.elements;
     const payload = {
-      name:     form.name.value.trim(),
-      phone:    form.phone.value.trim(),
-      service:  form.service.value,
-      timeline: form.timeline.value,
-      address:  form.address.value.trim(),
-      details:  form.details.value.trim(),
-      page:     window.location.href,
+      name: f.name.value.trim(),
+      phone: f.phone.value.trim(),
+      email: f.email.value.trim(),
+      service: f.service.value,
+      address: f.address.value.trim(),
+      timeline: f.timeline.value,
+      contactpref: f.contactpref.value,
+      details: f.details.value.trim(),
+      page: window.location.href,
     };
 
     if (!payload.name || !payload.phone || !payload.service) {
-      showModal(false, "Please fill in your name, phone, and service type.");
+      showResult(false, "Please fill in your name, phone, and service so we can help.");
       return;
     }
 
-    submitBtn.disabled    = true;
-    submitBtn.textContent = "Sending…";
-
-    // If placeholder URL still in place, simulate success in dev
-    if (SCRIPT_URL === "PLACEHOLDER_GOOGLE_SCRIPT_URL") {
-      await new Promise(r => setTimeout(r, 800));
-      form.reset();
+    const reset = () => {
       submitBtn.disabled = false;
       submitBtn.innerHTML = 'Send Request <span class="arrow">→</span>';
-      showModal(true);
+    };
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Sending…";
+
+    // Dev / pre-backend: simulate success while the endpoint is a placeholder
+    if (SCRIPT_URL === "PLACEHOLDER_GOOGLE_SCRIPT_URL") {
+      await new Promise((r) => setTimeout(r, 800));
+      form.reset();
+      reset();
+      showResult(true, 'We\'ll reach out as soon as possible. Or call us directly at <a href="tel:+12678866868">(267) 886-6868</a>.');
       return;
     }
 
@@ -281,53 +294,20 @@ if (form) {
     try {
       const res = await fetch(SCRIPT_URL, {
         method: "POST",
-        body:   JSON.stringify(payload),
         headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
       });
       ok = res.ok;
-    } catch (_) { ok = false; }
+    } catch (_) {
+      ok = false;
+    }
 
-    submitBtn.disabled    = false;
-    submitBtn.innerHTML   = 'Send Request <span class="arrow">→</span>';
-
+    reset();
     if (ok) {
       form.reset();
-      showModal(true);
+      showResult(true, 'We\'ll reach out as soon as possible. Or call us directly at <a href="tel:+12678866868">(267) 886-6868</a>.');
     } else {
-      showModal(false);
+      showResult(false, 'Something went wrong sending that. Please call or text us at <a href="tel:+12678866868">(267) 886-6868</a>.');
     }
   });
 }
-
-// ─────────────────────────────────────────────
-// 9. LEGAL MODALS (privacy / terms)
-// ─────────────────────────────────────────────
-function closeLegal(m) {
-  m.classList.remove("open");
-  m.setAttribute("aria-hidden", "true");
-  document.body.style.overflow = "";
-}
-
-document.querySelectorAll("[data-modal]").forEach(trigger => {
-  trigger.addEventListener("click", (e) => {
-    e.preventDefault();
-    const m = document.getElementById(trigger.dataset.modal);
-    if (!m) return;
-    m.classList.add("open");
-    m.setAttribute("aria-hidden", "false");
-    document.body.style.overflow = "hidden";
-    m.scrollTop = 0;
-  });
-});
-
-document.querySelectorAll(".legal-modal").forEach(m => {
-  m.addEventListener("click", (e) => {
-    if (e.target === m || e.target.closest("[data-close]")) closeLegal(m);
-  });
-});
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    document.querySelectorAll(".legal-modal.open").forEach(closeLegal);
-  }
-});

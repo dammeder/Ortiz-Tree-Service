@@ -32,11 +32,20 @@ if (hamburger && drawer) {
   const setDrawer = (open) => {
     drawer.classList.toggle("open", open);
     hamburger.setAttribute("aria-expanded", String(open));
+    hamburger.setAttribute("aria-label", open ? "Close menu" : "Open menu");
     drawer.setAttribute("aria-hidden", String(!open));
+    drawer.inert = !open;
     document.body.style.overflow = open ? "hidden" : "";
   };
   hamburger.addEventListener("click", () => setDrawer(!drawer.classList.contains("open")));
   drawer.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => setDrawer(false)));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && drawer.classList.contains("open")) {
+      setDrawer(false);
+      hamburger.focus();
+    }
+  });
+  setDrawer(false);
 }
 
 // ─────────────────────────────────────────────

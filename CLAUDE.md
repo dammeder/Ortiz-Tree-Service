@@ -9,8 +9,9 @@ left Ortiz Tree Service and started his own thing; this repo was the old Ortiz
 site, rebuilt and rebranded (Aug 2026). All leads route to **Ozzy's** number.
 
 - Repo name is still `Ortiz-Tree-Service` on GitHub — rename later.
-- `CNAME` still points at `ortiztrees.services` (Meder owns the domain). It's a
-  placeholder host until Ozzy has budget for his own domain.
+- Ozzy now owns `ozzystreeservice.com`. The DNS/Pages migration is being handled
+  separately; reconcile the Pages-created remote commit before changing or
+  pushing the locally stale `CNAME`.
 - Stack: plain HTML/CSS/JS, GitHub Pages, no build step.
 - Fonts: Playfair Display (display) + Inter (body). Palette: forest green
   (`--brand #0a5a2a`, `--cta #0c6b31`, `--accent #46b56a`) on near-black
@@ -47,15 +48,17 @@ Grep `TODO` in `index.html`. Ozzy was unreachable when this was built; these are
 educated guesses:
 - **Years experience:** stat says `10+` — unconfirmed.
 - **Satisfaction:** stat says `100%` — puffery placeholder.
-- **"Licensed & Insured":** claimed in hero, why-section, footer — UNVERIFIED.
+- **"Licensed & Insured":** confirmed by Meder; keep the claim.
 - **Reviews:** all 7 are fabricated (generic names, real PA/NJ towns). Ozzy
   okayed running placeholders short-term. No real people named.
-- **Images:** hero + 6 service cards are Ducky's photos (two show a "DUCKY'S
-  TREE SERVICE" shirt). Ozzy has zero real assets — everything needs generating.
+- **Images:** the six service-card photos were replaced with approved generated
+  Ozzy crew images. The existing hero remains intentionally unchanged for now.
 - **Logo:** none. Wordmark is text + an inline SVG leaf mark. Favicon is an
   inline SVG data URI.
-- **Form backend:** `SCRIPT_URL` in `script.js` is `PLACEHOLDER_GOOGLE_SCRIPT_URL`
-  — the form fakes a success response. Needs a new Google Apps Script + Sheet.
+- **Form backend:** live Google Sheet + Apps Script endpoint, wired into
+  `SCRIPT_URL` and verified through the real website form. Notifications
+  temporarily go to `mederemilev04@gmail.com`; switch to Ozzy's email and
+  deploy a new Apps Script version before launch.
 
 ## TODO (post-rebuild)
 
@@ -64,9 +67,10 @@ educated guesses:
 - [ ] Generate: logo, hero photo, 6 service-card photos, crew shots. (Old Ortiz
       image-gen prompts are in the vault note.)
 - [ ] Real reviews + Google Business Profile; wire a "See Google Reviews" link.
-- [ ] Stand up the form backend (new Sheet + Apps Script), paste URL into
-      `SCRIPT_URL`.
-- [ ] Buy Ozzy a domain, update `CNAME` + DNS, rename the GitHub repo.
+- [x] Stand up the form backend (new Sheet + Apps Script), paste URL into
+      `SCRIPT_URL`, and verify the Sheet row + email notification.
+- [ ] Finish the `ozzystreeservice.com` DNS/Pages migration, reconcile the
+      remote `CNAME` commit, then rename the GitHub repo later if desired.
 - [ ] Font experiments if Playfair feels too formal for the brand.
 - [ ] Verify mobile on a real device / DevTools responsive mode — the browser
       automation used to build this was locked at a 1710px viewport, so mobile

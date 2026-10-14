@@ -53,9 +53,9 @@ if (hamburger && drawer) {
 // ─────────────────────────────────────────────
 const typeEl = document.getElementById("typewriter-text");
 const phrases = [
-  "Professional Tree Removal & Care",
-  "Trees Down? We're On the Way.",
-  "Safe, Clean, Done Right.",
+  "Tree Removal & Care",
+  "Tree Down? Call Ozzy",
+  "Storm Cleanup, Start to Finish.",
 ];
 
 if (typeEl && !reduceMotion) {
@@ -79,35 +79,39 @@ if (typeEl && !reduceMotion) {
 // ─────────────────────────────────────────────
 // 4. STATS COUNT-UP
 // ─────────────────────────────────────────────
-const easeOutQuad = (t) => t * (2 - t);
-
-function animateCount(el) {
-  const target = parseInt(el.dataset.target, 10);
-  const suffix = el.dataset.suffix || "";
-  if (Number.isNaN(target)) return;
-  if (reduceMotion) { el.innerHTML = target + `<span class="suffix">${suffix}</span>`; return; }
-
-  const dur = 1400;
-  let start = null;
-  const step = (ts) => {
-    if (!start) start = ts;
-    const p = Math.min((ts - start) / dur, 1);
-    el.innerHTML = Math.floor(easeOutQuad(p) * target) + `<span class="suffix">${suffix}</span>`;
-    if (p < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
-
 const statEls = [...document.querySelectorAll("#statsBar .stat")];
-if (statEls.length) {
+if (statEls.length && !reduceMotion && "IntersectionObserver" in window) {
+  document.documentElement.classList.add("stats-animated");
+
+  const animateCount = (el) => {
+    const target = Number.parseInt(el.dataset.target, 10);
+    if (!Number.isFinite(target)) return;
+    const duration = 950;
+    let startedAt;
+    const step = (now) => {
+      if (startedAt === undefined) startedAt = now;
+      const progress = Math.min((now - startedAt) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = String(Math.min(target, Math.round(eased * target)));
+      if (progress < 1) requestAnimationFrame(step);
+      else el.textContent = String(target);
+    };
+    el.textContent = "0";
+    requestAnimationFrame(step);
+  };
+
   const statObs = new IntersectionObserver((entries) => {
-    entries.forEach((e) => {
-      if (!e.isIntersecting) return;
-      const num = e.target.querySelector(".stat-num[data-target]");
-      if (num) animateCount(num);
-      statObs.unobserve(e.target);
+    const entering = entries.filter((entry) => entry.isIntersecting);
+    entering.forEach((entry, index) => {
+      const stat = entry.target;
+      const delay = index * 110;
+      stat.style.setProperty("--stat-delay", `${delay}ms`);
+      stat.classList.add("stat-visible");
+      const count = stat.querySelector(".stat-count[data-target]");
+      if (count) window.setTimeout(() => animateCount(count), delay);
+      statObs.unobserve(stat);
     });
-  }, { threshold: 0.4 });
+  }, { threshold: 0.3 });
   statEls.forEach((el) => statObs.observe(el));
 }
 
@@ -248,7 +252,7 @@ document.addEventListener("keydown", (e) => {
 // ─────────────────────────────────────────────
 // 8. QUOTE FORM
 // ─────────────────────────────────────────────
-const SCRIPT_URL = "PLACEHOLDER_GOOGLE_SCRIPT_URL"; // TODO: paste Ozzy's Apps Script web-app URL
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw-lrovxlJqwch_I0Sd1ROoLj6VT_0OeIF_bDolgWQsOLox_sBt8inT6d5SmyNCjiyj/exec";
 
 const form = document.getElementById("quoteForm");
 const submitBtn = document.getElementById("submitBtn");
@@ -275,11 +279,19 @@ if (form && submitBtn) {
       timeline: f.timeline.value,
       contactpref: f.contactpref.value,
       details: f.details.value.trim(),
+      website: f.website.value.trim(),
       page: window.location.href,
     };
 
-    if (!payload.name || !payload.phone || !payload.service) {
-      showResult(false, "Please fill in your name, phone, and service so we can help.");
+    // Honeypot: bots commonly fill every field; real visitors never see this one.
+    if (payload.website) {
+      form.reset();
+      showResult(true, 'We\'ll reach out as soon as possible. Or call us directly at <a href="tel:+12678866868">(267) 886-6868</a>.');
+      return;
+    }
+
+    if (!payload.name || !payload.phone || !payload.service || !payload.timeline) {
+      showResult(false, "Please fill in your name, phone, service, and timeline so we can help.");
       return;
     }
 
@@ -290,23 +302,17 @@ if (form && submitBtn) {
     submitBtn.disabled = true;
     submitBtn.textContent = "Sending…";
 
-    // Dev / pre-backend: simulate success while the endpoint is a placeholder
-    if (SCRIPT_URL === "PLACEHOLDER_GOOGLE_SCRIPT_URL") {
-      await new Promise((r) => setTimeout(r, 800));
-      form.reset();
-      reset();
-      showResult(true, 'We\'ll reach out as soon as possible. Or call us directly at <a href="tel:+12678866868">(267) 886-6868</a>.');
-      return;
-    }
-
     let ok = false;
     try {
-      const res = await fetch(SCRIPT_URL, {
+      await fetch(SCRIPT_URL, {
         method: "POST",
+        mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload),
       });
-      ok = res.ok;
+      // Apps Script web apps return an opaque response in no-CORS mode. A
+      // resolved request means the browser handed the submission off.
+      ok = true;
     } catch (_) {
       ok = false;
     }

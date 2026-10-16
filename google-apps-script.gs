@@ -27,8 +27,16 @@ function doPost(event) {
       page: clean_(payload.page),
     };
 
-    if (!lead.name || !lead.phone || !lead.service || !lead.timeline) {
+    const phoneDigits = lead.phone.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+
+    if (!lead.name || !lead.phone || !lead.service || !lead.timeline || !lead.contactPreference) {
       return jsonResponse_({ ok: false, error: "Missing required fields" });
+    }
+    if (phoneDigits.length !== 10) {
+      return jsonResponse_({ ok: false, error: "Invalid phone number" });
+    }
+    if ((lead.name.match(/\p{L}/gu) || []).length < 2 || /\d/.test(lead.name)) {
+      return jsonResponse_({ ok: false, error: "Invalid name" });
     }
 
     const now = new Date();
